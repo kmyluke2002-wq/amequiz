@@ -345,23 +345,21 @@ function flipCard(){
   document.getElementById('rate-btns').style.display='flex';
 }
 
+const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfTbGPgfddX4XwaJvBLITeMQUDqlRChrjk5TnDUFIXWdlVXBg/viewform?usp=publish-editor';
+
 function openModal(){
   if(!queue.length)return;
   pendingReport=queue[0];
+  // 구글 폼에 질문 내용 미리 채워서 열기
+  const q = encodeURIComponent('[ATA '+curChapter.num+' '+curChapter.name+'] '+pendingReport.q);
+  window.open(FORM_URL+'&entry.0='+q, '_blank');
+  // 신고됨 표시
   const existing=reports.find(r=>r.q===pendingReport.q);
-  const overlay=document.createElement('div');
-  overlay.className='modal-bg';overlay.id='modal-overlay';
-  overlay.innerHTML=`
-    <div class="modal-box">
-      <h3>오류 신고</h3>
-      <p>"${pendingReport.q.substring(0,45)}${pendingReport.q.length>45?'...':''}"</p>
-      <textarea id="report-reason" placeholder="어떤 부분이 잘못되었나요? (선택사항)">${existing?existing.reason:''}</textarea>
-      <div class="modal-btns">
-        <button class="modal-cancel" onclick="closeModal()">취소</button>
-        <button class="modal-submit" onclick="submitReport()">신고 제출</button>
-      </div>
-    </div>`;
-  document.getElementById('card-area').appendChild(overlay);
+  if(!existing){
+    reports.push({q:pendingReport.q,a:pendingReport.a,chapter:'ATA '+curChapter.num+' '+curChapter.name,reason:'구글 폼으로 신고됨',time:new Date().toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})});
+    updateRepCount();
+  }
+  flipped?flipCard_refresh():showCard();
 }
 function closeModal(){const o=document.getElementById('modal-overlay');if(o)o.remove();pendingReport=null;}
 function submitReport(){
