@@ -77,18 +77,11 @@
 
   /* LAYOUT */
   .page {
-    max-width: 1200px;
+    max-width: 720px;
     margin: 0 auto;
-    padding: 16px 12px;
-    display: grid;
-    grid-template-columns: 140px minmax(0, 1fr) 140px;
-    gap: 12px;
-    align-items: start;
+    padding: 16px 16px;
   }
-  @media (max-width: 860px) {
-    .page { grid-template-columns: minmax(0,1fr); }
-    .ad-col { display: none; }
-  }
+  .ad-col { display: none; }
 
   /* ADS */
   .ad-col { display: flex; flex-direction: column; gap: 10px; }
