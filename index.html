@@ -401,20 +401,50 @@
 </footer>
 
 <script>
-const API_KEY = 'YOUR_API_KEY_HERE'; // ← 여기에 Anthropic API 키 입력
+const JSON_FILES = {
+  '05':'questions_ata05_09.json','06':'questions_ata05_09.json',
+  '07':'questions_ata05_09.json','08':'questions_ata05_09.json','09':'questions_ata05_09.json',
+  '10':'questions_ata10_20.json','11':'questions_ata10_20.json',
+  '12':'questions_ata10_20.json','20':'questions_ata10_20.json',
+  '21':'questions_ata21_29.json','22':'questions_ata21_29.json',
+  '23':'questions_ata21_29.json','24':'questions_ata21_29.json',
+  '26':'questions_ata21_29.json','27':'questions_ata21_29.json',
+  '28':'questions_ata21_29.json','29':'questions_ata21_29.json',
+  '30':'questions_ata30_36.json','31':'questions_ata30_36.json',
+  '32':'questions_ata30_36.json','33':'questions_ata30_36.json',
+  '34':'questions_ata30_36.json','35':'questions_ata30_36.json','36':'questions_ata30_36.json',
+  '51':'questions_ata51_57.json','52':'questions_ata51_57.json',
+  '53':'questions_ata51_57.json','54':'questions_ata51_57.json',
+  '55':'questions_ata51_57.json','56':'questions_ata51_57.json','57':'questions_ata51_57.json',
+  '71':'questions_ata71_80.json','72':'questions_ata71_80.json',
+  '73':'questions_ata71_80.json','74':'questions_ata71_80.json',
+  '75':'questions_ata71_80.json','76':'questions_ata71_80.json',
+  '77':'questions_ata71_80.json','78':'questions_ata71_80.json',
+  '79':'questions_ata71_80.json','80':'questions_ata71_80.json',
+};
+const jsonCache = {};
 
 const ATA_CHAPTERS = [
-  {num:'05',name:'정기점검'},{num:'06',name:'치수 및 구역'},{num:'07',name:'리프팅 및 쇼링'},
-  {num:'08',name:'레벨링 및 무게측정'},{num:'09',name:'견인 및 지상취급'},{num:'10',name:'주기 및 계류'},
-  {num:'12',name:'서비싱'},{num:'20',name:'표준 작업'},{num:'21',name:'에어컨 및 여압'},
-  {num:'22',name:'자동비행'},{num:'23',name:'통신'},{num:'24',name:'전기전원'},
-  {num:'26',name:'화재방지'},{num:'27',name:'비행조종'},{num:'28',name:'연료'},
-  {num:'29',name:'유압'},{num:'30',name:'결빙방지'},{num:'31',name:'계기'},
-  {num:'32',name:'랜딩기어'},{num:'33',name:'조명'},{num:'34',name:'항법'},
-  {num:'51',name:'구조 일반'},{num:'53',name:'동체'},{num:'57',name:'날개'},
-  {num:'71',name:'동력장치'},{num:'72',name:'엔진'},{num:'73',name:'엔진 연료 및 제어'},
-  {num:'74',name:'점화'},{num:'75',name:'블리드에어'},{num:'76',name:'엔진 제어'},
-  {num:'77',name:'엔진 지시'},{num:'78',name:'배기'},{num:'79',name:'엔진 오일'},{num:'80',name:'시동'},
+  {num:'05',name:'정기점검'},{num:'06',name:'치수 및 구역'},
+  {num:'07',name:'리프팅 및 쇼링'},{num:'08',name:'레벨링 및 무게측정'},
+  {num:'09',name:'견인 및 지상취급'},{num:'10',name:'주기 및 계류'},
+  {num:'11',name:'표찰 및 표지'},{num:'12',name:'서비싱'},
+  {num:'20',name:'표준 작업'},{num:'21',name:'에어컨 및 여압'},
+  {num:'22',name:'자동비행'},{num:'23',name:'통신'},
+  {num:'24',name:'전기전원'},{num:'26',name:'화재방지'},
+  {num:'27',name:'비행조종'},{num:'28',name:'연료'},
+  {num:'29',name:'유압'},{num:'30',name:'결빙방지'},
+  {num:'31',name:'계기'},{num:'32',name:'랜딩기어'},
+  {num:'33',name:'조명'},{num:'34',name:'항법'},
+  {num:'35',name:'산소'},{num:'36',name:'공압'},
+  {num:'51',name:'구조 일반'},{num:'52',name:'도어'},
+  {num:'53',name:'동체'},{num:'54',name:'나셀 및 파일론'},
+  {num:'55',name:'안정판'},{num:'56',name:'윈도우'},
+  {num:'57',name:'날개'},{num:'71',name:'동력장치'},
+  {num:'72',name:'엔진'},{num:'73',name:'엔진 연료 및 제어'},
+  {num:'74',name:'점화'},{num:'75',name:'블리드에어'},
+  {num:'76',name:'엔진 제어'},{num:'77',name:'엔진 지시'},
+  {num:'78',name:'배기'},{num:'79',name:'엔진 오일'},{num:'80',name:'시동'},
 ];
 
 let curChapter = null, queue = [], flipped = false, isLoading = false;
@@ -453,43 +483,27 @@ function selectChapter(ch, el) {
   loadQuestions(ch);
 }
 
-/* ── AI 질문 생성 ── */
+/* ── JSON 파일에서 질문 로드 ── */
 async function loadQuestions(ch) {
   isLoading = true;
   document.getElementById('rate-btns').style.display = 'none';
   document.getElementById('card-area').innerHTML = `
     <div class="loading-box">
       <div class="spinner"></div>
-      <span class="loading-txt">ATA ${ch.num} ${ch.name} 질문 생성 중...</span>
+      <span class="loading-txt">ATA ${ch.num} ${ch.name} 불러오는 중...</span>
     </div>`;
-  document.getElementById('q-badge').textContent = '생성 중...';
+  document.getElementById('q-badge').textContent = '로딩 중...';
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': API_KEY,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: `당신은 항공정비사(AME) 자격증 구술시험 전문 출제자입니다. 주어진 ATA 챕터에 대해 구술시험 형식의 질문 목록을 JSON으로만 반환하세요. 반드시 JSON 배열만 출력하고 다른 텍스트는 절대 포함하지 마세요.
-형식: [{"q":"질문 내용","a":"모범 답안 (3~5문장)"},...]
-규칙: 질문은 "~에 대해 설명하세요", "~의 종류를 설명하세요", "~의 목적은 무엇인가요", "~절차를 설명하세요" 형식. 15개 질문 생성.`,
-        messages: [{
-          role: 'user',
-          content: `ATA Chapter ${ch.num}: ${ch.name} 에 대한 항공정비사 구술시험 질문 15개를 JSON으로 생성하세요.`
-        }]
-      })
-    });
-
-    const data = await res.json();
-    const raw = data.content.map(b => b.text || '').join('');
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const qs = JSON.parse(clean);
+    const fileName = JSON_FILES[ch.num];
+    if (!fileName) throw new Error('파일 없음');
+    if (!jsonCache[fileName]) {
+      const res = await fetch(fileName);
+      if (!res.ok) throw new Error('파일 로드 실패');
+      jsonCache[fileName] = await res.json();
+    }
+    const qs = jsonCache[fileName][ch.num];
+    if (!qs || !qs.length) throw new Error('질문 없음');
     queue = shuffle([...qs]);
     isLoading = false;
     document.getElementById('q-badge').textContent = 'ATA ' + ch.num + ' · ' + qs.length + '문항';
@@ -497,7 +511,7 @@ async function loadQuestions(ch) {
     showCard();
   } catch(e) {
     isLoading = false;
-    document.getElementById('card-area').innerHTML = `<div class="err-box">질문 생성 중 오류가 발생했습니다.<br>API 키를 확인하거나 다시 시도해 주세요.</div>`;
+    document.getElementById('card-area').innerHTML = `<div class="err-box">질문을 불러오지 못했습니다.<br>JSON 파일이 같은 폴더에 있는지 확인해 주세요.</div>`;
     document.getElementById('q-badge').textContent = '오류';
   }
 }
@@ -522,7 +536,7 @@ function showCard() {
         <div class="card-q">${c.q}</div>
         <div class="card-hint">탭하여 모범답안 확인</div>
       </div>
-      <div class="disclaimer">⚠ AI 생성 답변입니다. 공식 교재(AMM)와 함께 활용하세요.</div>
+      <div class="disclaimer">⚠ 학습용 답변입니다. 공식 교재(AMM)와 함께 활용하세요.</div>
     </div>
     <p class="card-oral" style="margin-top:8px;">소리 내어 답을 말해본 뒤 확인하세요</p>`;
   flipped = false;
@@ -544,7 +558,7 @@ function flipCard() {
       </div>
       <div class="card-q" style="cursor:default;">${c.q}</div>
       <div class="card-a">${c.a}</div>
-      <div class="disclaimer">⚠ AI 생성 답변입니다. 공식 교재(AMM)와 함께 활용하세요.</div>
+      <div class="disclaimer">⚠ 학습용 답변입니다. 공식 교재(AMM)와 함께 활용하세요.</div>
     </div>`;
   document.getElementById('rate-btns').style.display = 'flex';
 }
