@@ -110,6 +110,11 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:12px
 
 /* 모바일용 버튼 */
 .mobile-ata-btn{display:none;width:100%;padding:10px 14px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--bg);font-size:13px;color:var(--text2);font-family:inherit;cursor:pointer;text-align:left;align-items:center;justify-content:space-between;}
+.random-btn{width:100%;padding:10px 14px;border:none;border-bottom:0.5px solid var(--border);background:var(--info-bg);color:var(--info-text);font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s;flex-shrink:0;}
+.random-btn:hover{background:var(--info-text);color:var(--bg);}
+.random-btn.on{background:var(--info-text);color:var(--bg);}
+.mobile-random-btn{display:none;width:100%;padding:10px 14px;border-radius:var(--radius);border:0.5px solid var(--border);background:var(--info-bg);color:var(--info-text);font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;margin-bottom:6px;}
+@media(max-width:680px){.mobile-random-btn{display:block;}}
 
 /* 모바일 드로어 */
 .drawer-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;}
@@ -140,6 +145,7 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
 
 <div class="page">
   <div class="main">
+    <button class="mobile-random-btn" onclick="startRandomAll()">&#9734; 전체 랜덤 모드</button>
     <button class="mobile-ata-btn" onclick="openDrawer()">
       <span id="mobile-ch-label">ATA 챕터 선택하기</span>
       <span>&#9776;</span>
@@ -187,6 +193,9 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
       ATA 챕터
       <span class="sidebar-total">615문항</span>
     </div>
+    <button class="random-btn" onclick="startRandomAll()" id="random-btn">
+      &#9734; 전체 랜덤
+    </button>
     <div class="ata-list" id="ata-list"></div>
   </div>
 </div>
@@ -255,6 +264,51 @@ const ATA_CHAPTERS = [
 let curChapter=null,queue=[],flipped=false,isLoading=false;
 let ct={again:0,good:0,easy:0},reports=[],pendingReport=null;
 
+async function startRandomAll(){
+  if(isLoading)return;
+  // 모든 JSON 파일 로드
+  const files=[...new Set(Object.values(JSON_FILES))];
+  isLoading=true;
+  document.getElementById('rate-btns').style.display='none';
+  document.getElementById('card-area').innerHTML=`
+    <div class="loading-box"><div class="spinner"></div>
+    <span class="loading-txt">전체 615문항 불러오는 중...</span></div>`;
+  document.getElementById('q-badge').textContent='로딩 중...';
+  try{
+    for(const f of files){
+      if(!jsonCache[f]){
+        const res=await fetch(f);
+        if(!res.ok)throw new Error('실패');
+        jsonCache[f]=await res.json();
+      }
+    }
+    // 전체 문항 합치기
+    let all=[];
+    ATA_CHAPTERS.forEach(ch=>{
+      const f=JSON_FILES[ch.num];
+      if(f&&jsonCache[f]&&jsonCache[f][ch.num]){
+        all=all.concat(jsonCache[f][ch.num]);
+      }
+    });
+    queue=shuffle([...all]);
+    curChapter={num:'전체',name:'랜덤'};
+    ct={again:0,good:0,easy:0};
+    updateStats();
+    isLoading=false;
+    document.getElementById('q-badge').textContent='전체 랜덤 · '+all.length+'문항';
+    // 사이드바 선택 해제
+    document.querySelectorAll('.ata-item').forEach(el=>el.classList.remove('on'));
+    document.getElementById('random-btn').classList.add('on');
+    document.getElementById('mobile-ch-label').textContent='전체 랜덤 모드';
+    flipped=false;
+    showCard();
+  }catch(e){
+    isLoading=false;
+    document.getElementById('card-area').innerHTML=`<div class="err-box">불러오지 못했습니다. 다시 시도해 주세요.</div>`;
+    document.getElementById('q-badge').textContent='오류';
+  }
+}
+
 function buildSidebar(){
   const sideList=document.getElementById('ata-list');
   const drawList=document.getElementById('drawer-list');
@@ -278,6 +332,7 @@ function selectChapter(ch){
   document.querySelectorAll('.ata-item').forEach(el=>{
     el.classList.toggle('on',el.dataset.num===ch.num);
   });
+  document.getElementById('random-btn').classList.remove('on');
   document.getElementById('mobile-ch-label').textContent='ATA '+ch.num+' '+ch.name;
   loadQuestions(ch);
 }
