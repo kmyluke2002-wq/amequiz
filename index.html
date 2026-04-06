@@ -101,6 +101,13 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:12px
 .ata-list::-webkit-scrollbar{width:4px;}
 .ata-list::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
 .ata-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;transition:background .12s;border:none;background:transparent;width:100%;text-align:left;font-family:inherit;}
+.ata-progress{margin-left:auto;font-size:10px;color:var(--text3);background:var(--bg2);padding:2px 6px;border-radius:10px;white-space:nowrap;}
+.ata-item.on .ata-progress{background:rgba(255,255,255,0.2);color:var(--info-text);}
+.wrong-item{padding:10px 0;border-bottom:0.5px solid var(--border);font-size:13px;}
+.wrong-item:last-child{border-bottom:none;}
+.wrong-item .wq{font-weight:500;color:var(--text);margin-bottom:4px;}
+.wrong-item .wch{font-size:11px;color:var(--text3);}
+.wrong-clear{font-size:12px;color:var(--danger-text);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
 .ata-item:hover{background:var(--bg2);}
 .ata-item.on{background:var(--info-bg);}
 .ata-num{font-size:11px;font-weight:500;color:var(--text3);min-width:26px;}
@@ -153,7 +160,8 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
 
     <div class="tab-row">
       <button class="tab on" onclick="switchTab('study',this)">학습</button>
-      <button class="tab" onclick="switchTab('reports',this)">오류 신고 목록 <span id="rep-count"></span></button>
+      <button class="tab" onclick="switchTab('wrong',this)">오답 <span id="wrong-count"></span></button>
+      <button class="tab" onclick="switchTab('reports',this)">오류 신고 <span id="rep-count"></span></button>
     </div>
 
     <div class="panel" id="tab-study" style="display:flex;flex-direction:column;">
@@ -177,6 +185,14 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
         <div class="st"><div class="st-n" id="s-good">0</div><div class="st-l">알겠음</div></div>
         <div class="st"><div class="st-n" id="s-easy">0</div><div class="st-l">쉬움</div></div>
       </div>
+    </div>
+
+    <div class="panel" id="tab-wrong" style="display:none;flex-direction:column;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:13px;font-weight:500;color:var(--text2);">틀린 문제 모음</span>
+        <button class="btn btn-d" style="padding:5px 12px;font-size:12px;" onclick="startWrongMode()">오답만 풀기</button>
+      </div>
+      <div id="wrong-list"><span class="empty-report">아직 틀린 문제가 없어요</span></div>
     </div>
 
     <div class="panel" id="tab-reports" style="display:none;">
@@ -263,6 +279,93 @@ const ATA_CHAPTERS = [
 
 let curChapter=null,queue=[],flipped=false,isLoading=false;
 let ct={again:0,good:0,easy:0},reports=[],pendingReport=null;
+let wrongList=JSON.parse(localStorage.getItem('ame_wrong')||'[]');
+let progress=JSON.parse(localStorage.getItem('ame_progress')||'{}');
+
+function saveWrong(){localStorage.setItem('ame_wrong',JSON.stringify(wrongList));}
+function saveProgress(){localStorage.setItem('ame_progress',JSON.stringify(progress));}
+
+function addWrong(c){
+  if(!curChapter||curChapter.num==='전체')return;
+  const exists=wrongList.find(w=>w.q===c.q);
+  if(!exists){
+    wrongList.push({q:c.q,a:c.a,chapter:'ATA '+curChapter.num+' '+curChapter.name,count:1});
+  } else {
+    exists.count=(exists.count||1)+1;
+  }
+  saveWrong();
+  updateWrongCount();
+}
+
+function removeWrong(q){
+  wrongList=wrongList.filter(w=>w.q!==q);
+  saveWrong();
+  updateWrongCount();
+  renderWrongList();
+}
+
+function updateWrongCount(){
+  const el=document.getElementById('wrong-count');
+  if(el) el.textContent=wrongList.length>0?'('+wrongList.length+')':'';
+}
+
+function updateProgressRecord(){
+  if(!curChapter||curChapter.num==='전체')return;
+  const key=curChapter.num;
+  if(!progress[key]) progress[key]={good:0,easy:0,total:0};
+  progress[key].good=ct.good;
+  progress[key].easy=ct.easy;
+  saveProgress();
+  updateSidebarProgress();
+}
+
+function updateSidebarProgress(){
+  ATA_CHAPTERS.forEach(ch=>{
+    const p=progress[ch.num];
+    document.querySelectorAll('.ata-progress[data-num="'+ch.num+'"]').forEach(el=>{
+      if(p&&(p.good+p.easy)>0){
+        const pct=Math.round((p.good+p.easy)/15*100);
+        el.textContent=pct+'%';
+        el.style.color='var(--success-text)';
+        el.style.background='var(--success-bg)';
+      }
+    });
+  });
+}
+
+async function startWrongMode(){
+  if(!wrongList.length){alert('아직 틀린 문제가 없어요!');return;}
+  curChapter={num:'오답',name:'모아보기'};
+  queue=shuffle([...wrongList]);
+  ct={again:0,good:0,easy:0};
+  updateStats();
+  document.querySelectorAll('.ata-item').forEach(el=>el.classList.remove('on'));
+  document.getElementById('random-btn').classList.remove('on');
+  document.getElementById('mobile-ch-label').textContent='오답 모아보기';
+  document.getElementById('q-badge').textContent='오답 · '+wrongList.length+'문항';
+  flipped=false;
+  switchTab('study',document.querySelector('.tab'));
+  showCard();
+}
+
+function renderWrongList(){
+  const list=document.getElementById('wrong-list');
+  if(!wrongList.length){list.innerHTML='<span class="empty-report">아직 틀린 문제가 없어요</span>';return;}
+  list.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <span style="font-size:12px;color:var(--text3);">총 ${wrongList.length}문제</span>
+    <button class="wrong-clear" onclick="clearAllWrong()">전체 삭제</button>
+  </div>`+wrongList.map((w,i)=>`
+    <div class="wrong-item">
+      <div class="wch">${w.chapter} · ${w.count||1}회 틀림</div>
+      <div class="wq">${w.q}</div>
+      <button class="wrong-clear" onclick="removeWrong('${w.q.replace(/'/g,"\'")}')">삭제</button>
+    </div>`).join('');
+}
+
+function clearAllWrong(){
+  if(!confirm('오답 목록을 전체 삭제할까요?'))return;
+  wrongList=[];saveWrong();updateWrongCount();renderWrongList();
+}
 
 async function startRandomAll(){
   if(isLoading)return;
@@ -317,7 +420,7 @@ function buildSidebar(){
       const btn=document.createElement('button');
       btn.className='ata-item';
       btn.dataset.num=ch.num;
-      btn.innerHTML=`<span class="ata-num">${ch.num}</span><span class="ata-name">${ch.name}</span>`;
+      btn.innerHTML=`<span class="ata-num">${ch.num}</span><span class="ata-name">${ch.name}</span><span class="ata-progress" data-num="${ch.num}"></span>`;
       btn.onclick=()=>{selectChapter(ch);closeDrawer();};
       container.appendChild(btn);
     });
@@ -436,9 +539,17 @@ function submitReport(){
 function flipCard_refresh(){const btn=document.getElementById('rep-btn');if(btn){btn.textContent='신고됨';btn.classList.add('reported');}}
 
 function rate(r){
+  const c=queue[0];
   ct[r]++;
-  if(r==='again'){const c=queue.shift();queue.push(c);}else queue.shift();
-  updateStats();showCard();
+  if(r==='again'){
+    addWrong(c);
+    const card=queue.shift();queue.push(card);
+  } else {
+    queue.shift();
+  }
+  updateStats();
+  updateProgressRecord();
+  showCard();
 }
 function updateStats(){
   document.getElementById('s-again').textContent=ct.again;
@@ -459,8 +570,10 @@ function switchTab(tab,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
   document.getElementById('tab-study').style.display=tab==='study'?'flex':'none';
+  document.getElementById('tab-wrong').style.display=tab==='wrong'?'flex':'none';
   document.getElementById('tab-reports').style.display=tab==='reports'?'flex':'none';
   if(tab==='reports')renderReportList();
+  if(tab==='wrong')renderWrongList();
 }
 function renderReportList(){
   const list=document.getElementById('report-list');
@@ -491,6 +604,8 @@ function openDrawer(){document.getElementById('drawer').classList.add('open');do
 function closeDrawer(){document.getElementById('drawer').classList.remove('open');document.getElementById('drawer-overlay').classList.remove('open');}
 
 buildSidebar();
+updateWrongCount();
+updateSidebarProgress();
 </script>
 </body>
 </html>
