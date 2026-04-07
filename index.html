@@ -32,6 +32,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
 .logo{font-size:16px;font-weight:500;color:var(--text);}
 .logo span{color:var(--green);}
+.active-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--success-bg);color:var(--success-text);font-weight:500;}
 .header-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--info-bg);color:var(--info-text);font-weight:500;}
 .page{max-width:1000px;margin:0 auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:14px;align-items:start;}
 @media(max-width:680px){.page{grid-template-columns:minmax(0,1fr);}.sidebar{display:none;}.mobile-ata-btn{display:flex !important;}}
@@ -148,6 +149,7 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
 <header>
   <span class="logo">AME<span>Quiz</span></span>
   <span class="header-badge" id="q-badge">챕터 선택</span>
+  <span class="active-badge" id="active-users">접속 중...</span>
 </header>
 
 <div class="page">
@@ -606,6 +608,39 @@ function closeDrawer(){document.getElementById('drawer').classList.remove('open'
 buildSidebar();
 updateWrongCount();
 updateSidebarProgress();
+</script>
+
+<!-- Firebase 실시간 접속자 -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getDatabase, ref, onValue, push, remove, onDisconnect } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB08Cu_-umojKfkIlgPSI5e4OFB9cS6jzM",
+    authDomain: "amequiz-1207b.firebaseapp.com",
+    databaseURL: "https://amequiz-1207b-default-rtdb.firebaseio.com",
+    projectId: "amequiz-1207b",
+    storageBucket: "amequiz-1207b.firebasestorage.app",
+    messagingSenderId: "44490807463",
+    appId: "1:44490807463:web:0595adc179ed2708ac2382",
+    measurementId: "G-EM98QJQZGV"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const usersRef = ref(db, 'activeUsers');
+
+  // 접속 시 등록
+  const myRef = push(usersRef, { t: Date.now() });
+  // 탭 닫으면 자동 삭제
+  onDisconnect(myRef).remove();
+
+  // 실시간 접속자 수 표시
+  onValue(usersRef, (snap) => {
+    const count = snap.exists() ? Object.keys(snap.val()).length : 0;
+    const el = document.getElementById('active-users');
+    if (el) el.textContent = count + '명 공부 중 🟢';
+  });
 </script>
 </body>
 </html>
