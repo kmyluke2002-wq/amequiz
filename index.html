@@ -143,8 +143,6 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
   gtag('js', new Date());
   gtag('config', 'G-4FCWSSXEWJ');
 </script>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9957526681486360"
-     crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -209,9 +207,15 @@ footer{text-align:center;padding:20px;font-size:12px;color:var(--text3);border-t
 
   <!-- 오른쪽 사이드바 -->
   <div class="sidebar">
-    <div class="sidebar-header">
-      ATA 챕터
-      <span class="sidebar-total">1230문항</span>
+    <div class="sidebar-header" style="flex-direction:column;align-items:stretch;gap:8px;padding-bottom:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <span id="sidebar-mode-label">ATA 챕터</span>
+        <span class="sidebar-total" id="sidebar-total-label">1230문항</span>
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button id="mode-ata-btn" onclick="switchMode('ata')" style="flex:1;padding:5px 4px;border-radius:6px;border:0.5px solid var(--border2);background:var(--info-bg);color:var(--info-text);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;">ATA 기본</button>
+        <button id="mode-oral-btn" onclick="switchMode('oral')" style="flex:1;padding:5px 4px;border-radius:6px;border:0.5px solid var(--border);background:transparent;color:var(--text3);font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;">📋 구술 후기</button>
+      </div>
     </div>
     <button class="random-btn" onclick="startRandomAll()" id="random-btn">
       &#9734; 전체 랜덤
@@ -280,6 +284,20 @@ const ATA_CHAPTERS = [
   {num:'76',name:'엔진 제어'},{num:'77',name:'엔진 지시'},
   {num:'78',name:'배기'},{num:'79',name:'엔진 오일'},{num:'80',name:'시동'},
 ];
+
+const ORAL_CATEGORIES = [
+  {num:'oral_law',         name:'법규/정비방식'},
+  {num:'oral_structure_material', name:'구조/재료'},
+  {num:'oral_landing_gear',name:'랜딩기어'},
+  {num:'oral_fuel_hydraulic',name:'연료/유압'},
+  {num:'oral_electrical',  name:'전기계통'},
+  {num:'oral_engine_fire', name:'엔진/화재'},
+  {num:'oral_pressurization_oxygen',name:'여압/산소'},
+  {num:'oral_navigation_instrument',name:'항법/계기'},
+  {num:'oral_deice_misc',  name:'제방빙/기타'},
+];
+const ORAL_FILE = 'questions_oral_review.json';
+let currentMode = 'ata';
 
 let curChapter=null,queue=[],flipped=false,isLoading=false;
 let ct={again:0,good:0,easy:0},reports=[],pendingReport=null;
@@ -373,7 +391,40 @@ function clearAllWrong(){
 
 async function startRandomAll(){
   if(isLoading)return;
-  // 모든 JSON 파일 로드
+  if(currentMode === 'oral'){
+    // 구술 후기 전체 랜덤
+    isLoading=true;
+    document.getElementById('rate-btns').style.display='none';
+    document.getElementById('card-area').innerHTML=`<div class="loading-box"><div class="spinner"></div><span class="loading-txt">구술 후기 83문항 불러오는 중...</span></div>`;
+    document.getElementById('q-badge').textContent='로딩 중...';
+    try{
+      if(!jsonCache[ORAL_FILE]){
+        const res=await fetch(ORAL_FILE);
+        if(!res.ok)throw new Error('실패');
+        jsonCache[ORAL_FILE]=await res.json();
+      }
+      let all=[];
+      ORAL_CATEGORIES.forEach(cat=>{
+        if(jsonCache[ORAL_FILE][cat.num]) all=all.concat(jsonCache[ORAL_FILE][cat.num]);
+      });
+      queue=shuffle([...all]);
+      curChapter={num:'구술전체',name:'랜덤'};
+      ct={again:0,good:0,easy:0};
+      updateStats();
+      isLoading=false;
+      document.getElementById('q-badge').textContent='구술 전체 랜덤 · '+all.length+'문항';
+      document.querySelectorAll('.ata-item').forEach(el=>el.classList.remove('on'));
+      document.getElementById('random-btn').classList.add('on');
+      document.getElementById('mobile-ch-label').textContent='구술 전체 랜덤';
+      flipped=false;
+      showCard();
+    }catch(e){
+      isLoading=false;
+      document.getElementById('card-area').innerHTML=`<div class="err-box">불러오지 못했습니다. 다시 시도해 주세요.</div>`;
+    }
+    return;
+  }
+  // ATA 기본 전체 랜덤
   const files=[...new Set(Object.values(JSON_FILES))];
   isLoading=true;
   document.getElementById('rate-btns').style.display='none';
@@ -416,19 +467,97 @@ async function startRandomAll(){
   }
 }
 
+function switchMode(mode){
+  currentMode = mode;
+  const ataBtn = document.getElementById('mode-ata-btn');
+  const oralBtn = document.getElementById('mode-oral-btn');
+  const label = document.getElementById('sidebar-mode-label');
+  const total = document.getElementById('sidebar-total-label');
+  if(mode === 'oral'){
+    ataBtn.style.background='transparent'; ataBtn.style.color='var(--text3)'; ataBtn.style.borderColor='var(--border)';
+    oralBtn.style.background='var(--warning-bg)'; oralBtn.style.color='var(--warning-text)'; oralBtn.style.borderColor='var(--border2)';
+    label.textContent = '구술 후기 문제';
+    total.textContent = '83문항';
+    document.getElementById('random-btn').textContent = '★ 구술 전체 랜덤';
+  } else {
+    oralBtn.style.background='transparent'; oralBtn.style.color='var(--text3)'; oralBtn.style.borderColor='var(--border)';
+    ataBtn.style.background='var(--info-bg)'; ataBtn.style.color='var(--info-text)'; ataBtn.style.borderColor='var(--border2)';
+    label.textContent = 'ATA 챕터';
+    total.textContent = '1230문항';
+    document.getElementById('random-btn').textContent = '☆ 전체 랜덤';
+  }
+  buildSidebar();
+  curChapter = null;
+  ct={again:0,good:0,easy:0};
+  updateStats();
+  document.getElementById('card-area').innerHTML=`<div class="loading-box"><span class="loading-txt">${mode==='oral'?'카테고리를 선택하세요':'오른쪽에서 ATA 챕터를 선택하세요'}</span></div>`;
+  document.getElementById('rate-btns').style.display='none';
+  document.getElementById('q-badge').textContent='챕터 선택';
+}
+
+async function loadOralCategory(cat){
+  if(isLoading)return;
+  isLoading=true;
+  curChapter={num:cat.num, name:cat.name};
+  ct={again:0,good:0,easy:0};
+  updateStats();
+  document.getElementById('rate-btns').style.display='none';
+  document.getElementById('card-area').innerHTML=`<div class="loading-box"><div class="spinner"></div><span class="loading-txt">${cat.name} 불러오는 중...</span></div>`;
+  document.getElementById('q-badge').textContent='로딩 중...';
+  document.querySelectorAll('.ata-item').forEach(el=>el.classList.remove('on'));
+  document.querySelectorAll('.ata-item[data-num="'+cat.num+'"]').forEach(el=>el.classList.add('on'));
+  document.getElementById('random-btn').classList.remove('on');
+  document.getElementById('mobile-ch-label').textContent=cat.name;
+  try{
+    if(!jsonCache[ORAL_FILE]){
+      const res=await fetch(ORAL_FILE);
+      if(!res.ok)throw new Error('실패');
+      jsonCache[ORAL_FILE]=await res.json();
+    }
+    const qs=jsonCache[ORAL_FILE][cat.num];
+    if(!qs||!qs.length)throw new Error('비어있음');
+    queue=shuffle([...qs]);
+    isLoading=false;
+    document.getElementById('q-badge').textContent=cat.name+' · '+qs.length+'문항';
+    flipped=false;
+    showCard();
+  }catch(e){
+    isLoading=false;
+    document.getElementById('card-area').innerHTML=`<div class="err-box">불러오지 못했습니다.<br>questions_oral_review.json 파일을 확인해 주세요.</div>`;
+    document.getElementById('q-badge').textContent='오류';
+  }
+}
+
 function buildSidebar(){
   const sideList=document.getElementById('ata-list');
   const drawList=document.getElementById('drawer-list');
-  ATA_CHAPTERS.forEach(ch=>{
-    [sideList,drawList].forEach(container=>{
-      const btn=document.createElement('button');
-      btn.className='ata-item';
-      btn.dataset.num=ch.num;
-      btn.innerHTML=`<span class="ata-num">${ch.num}</span><span class="ata-name">${ch.name}</span><span class="ata-progress" data-num="${ch.num}"></span>`;
-      btn.onclick=()=>{selectChapter(ch);closeDrawer();};
-      container.appendChild(btn);
+  [sideList,drawList].forEach(c=>c.innerHTML='');
+
+  if(currentMode === 'oral'){
+    ORAL_CATEGORIES.forEach(cat=>{
+      [sideList,drawList].forEach(container=>{
+        const btn=document.createElement('button');
+        btn.className='ata-item';
+        btn.dataset.num=cat.num;
+        const countMap={oral_law:15,oral_structure_material:15,oral_landing_gear:7,oral_fuel_hydraulic:7,oral_electrical:8,oral_engine_fire:10,oral_pressurization_oxygen:5,oral_navigation_instrument:8,oral_deice_misc:8};
+        btn.innerHTML=`<span class="ata-name" style="flex:1;">${cat.name}</span><span class="ata-progress" data-num="${cat.num}">${countMap[cat.num]||''}문항</span>`;
+        btn.onclick=()=>{loadOralCategory(cat);closeDrawer();};
+        container.appendChild(btn);
+      });
     });
-  });
+  } else {
+    ATA_CHAPTERS.forEach(ch=>{
+      [sideList,drawList].forEach(container=>{
+        const btn=document.createElement('button');
+        btn.className='ata-item';
+        btn.dataset.num=ch.num;
+        btn.innerHTML=`<span class="ata-num">${ch.num}</span><span class="ata-name">${ch.name}</span><span class="ata-progress" data-num="${ch.num}"></span>`;
+        btn.onclick=()=>{selectChapter(ch);closeDrawer();};
+        container.appendChild(btn);
+      });
+    });
+    updateSidebarProgress();
+  }
 }
 
 function selectChapter(ch){
@@ -480,10 +609,11 @@ function showCard(){
   if(!queue.length){showDone();return;}
   const c=queue[0];
   const isRep=reports.some(r=>r.q===c.q);
+  const chLabel = curChapter.num.startsWith("oral") ? curChapter.name : "ATA "+curChapter.num+" · "+curChapter.name;
   document.getElementById('card-area').innerHTML=`
     <div class="card-wrap">
       <div class="card-top">
-        <span class="card-ata">ATA ${curChapter.num} · ${curChapter.name}</span>
+        <span class="card-ata">${chLabel}</span>
         <button class="report-btn${isRep?' reported':''}" onclick="openModal()" id="rep-btn">${isRep?'신고됨':'오류 신고'}</button>
       </div>
       <div onclick="flipCard()">
@@ -502,10 +632,11 @@ function flipCard(){
   flipped=true;
   const c=queue[0];
   const isRep=reports.some(r=>r.q===c.q);
+  const chLabel = curChapter.num.startsWith("oral") ? curChapter.name : "ATA "+curChapter.num+" · "+curChapter.name;
   document.getElementById('card-area').innerHTML=`
     <div class="card-wrap">
       <div class="card-top">
-        <span class="card-ata">ATA ${curChapter.num} · ${curChapter.name}</span>
+        <span class="card-ata">${chLabel}</span>
         <button class="report-btn${isRep?' reported':''}" onclick="openModal()" id="rep-btn">${isRep?'신고됨':'오류 신고'}</button>
       </div>
       <div class="card-q" style="cursor:default;">${c.q}</div>
